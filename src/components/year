@@ -1,0 +1,26 @@
+// useEffect(() => {
+//   axios
+//     .get(`${endPoint}/curriculum-yearstarted`)
+//     .then((response) => {
+//       const data = response.data;
+//       const years = data.map((item) => item.year_started);
+
+//       // Extract year from student number
+//       const admissionYear = parseInt(studentNumber.substring(0, 4));
+//       console.log("Admission Year:", admissionYear);
+
+//       let courseType = "";
+//       years.sort(); // Sort the years array in ascending order
+
+//       // Find the first year in the array greater than or equal to the admission year
+//       const matchingYear = years.find((year) => year >= admissionYear);
+//       if (matchingYear !== undefined && admissionYear < matchingYear) {
+//         courseType = admissionYear;
+//       } else {
+//         courseType = years[years.length - 1] || "";
+//       }
+
+//       console.log("Course type:", courseType);
+
+//       return courseType; // Return the courseType for chaining the promise
+//     })

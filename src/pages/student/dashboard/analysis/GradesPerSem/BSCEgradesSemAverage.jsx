@@ -1,0 +1,594 @@
+import ApexCharts from "apexcharts";
+import axios from "axios";
+import Cookies from "js-cookie";
+import PropTypes from "prop-types";
+
+import { Box, VStack } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
+import { endPoint } from "../../../../config";
+
+export default function BSCEGradesperSemester({
+  studentNumber,
+  onGradesDataChange,
+}) {
+  const strand = Cookies.get("strand");
+  const [programId, setProgramId] = useState();
+  const [courseType, setCourseType] = useState("");
+  const [firstYearFirstSem, setFirstYearFirstSem] = useState([]);
+  const [firstYearSecondSem, setFirstYearSecondSem] = useState([]);
+  const [secondYearFirstSem, setSecondYearFirstSem] = useState([]);
+  const [secondYearSecondSem, setSecondYearSecondSem] = useState([]);
+  const [secondYearSummerSem, setSecondYearSummerSem] = useState([]);
+  const [thirdYearFirstSem, setThirdYearFirstSem] = useState([]);
+  const [thirdYearSecondSem, setThirdYearSecondSem] = useState([]);
+  const [thirdYearSummerSem, setThirdYearSummerSem] = useState([]);
+  const [fourthYearFirstSem, setFourthYearFirstSem] = useState([]);
+  const [fourthYearSecondSem, setFourthYearSecondSem] = useState([]);
+
+  const [firstYearFirstSemAverage, setFirstYearFirstSemAverage] = useState(0);
+  const [firstYearSecondSemAverage, setFirstYearSecondSemAverage] = useState(0);
+  const [SecondYearFirstSemAverage, setSecondYearFirstSemAverage] = useState(0);
+  const [SecondYearSecondSemAverage, setSecondYearSecondSemAverage] =
+    useState(0);
+  const [SecondYearSummerSemAverage, setSecondYearSummerSemAverage] =
+    useState(0);
+
+  const [ThirdYearFirstSemAverage, setThirdYearFirstSemAverage] = useState(0);
+  const [ThirdYearSecondSemAverage, setThirdYearSecondSemAverage] = useState(0);
+  const [ThirdYearSummerSemAverage, setThirdYearSummerSemAverage] = useState(0);
+  const [FourthYearFirstSemAverage, setFourthYearFirstSemAverage] = useState(0);
+  const [FourthYearSecondSemAverage, setFourthYearSecondSemAverage] =
+    useState(0);
+
+  useEffect(() => {
+    axios
+      .get(`${endPoint}/curriculum-yearstarted`)
+      .then((response) => {
+        const data = response.data;
+        const yearsSet = new Set(data.map((item) => item.year_started));
+        const years = Array.from(yearsSet);
+
+        const admissionYear = parseInt(studentNumber.substring(0, 4));
+
+        years.sort();
+
+        const matchingYear = years.find((year) => year <= admissionYear);
+        if (matchingYear !== undefined) {
+          setCourseType(matchingYear);
+        } else {
+          setCourseType(years[years.length - 1] || "");
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching data:", error);
+      });
+  }, [studentNumber]);
+
+  //fetch student
+  useEffect(() => {
+    console.log("Fetching student data...");
+
+    async function fetchStudentData() {
+      try {
+        const response = await axios.get(
+          `${endPoint}/students?studentNumber=${studentNumber}`
+        );
+        const studentData = response.data;
+
+        setProgramId(studentData.program_id);
+        console.log("Student data fetched:", studentData);
+      } catch (error) {
+        console.error("Error fetching student data:", error);
+      }
+    }
+
+    fetchStudentData();
+    console.log("Fetching student data complete.");
+  }, [studentNumber]);
+
+  // fetch curriculum
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch curriculum data to get course_year and course_sem information
+        const curriculumResponse = await axios.get(
+          `${endPoint}/curriculum?program_id=${programId}&year_started=${courseType}`
+        );
+
+        const curriculumData = curriculumResponse.data;
+        console.log("Curriculum Data:", curriculumData);
+
+        // Fetch grades data
+        const gradesResponse = await axios.get(
+          `${endPoint}/grades?studentNumber=${studentNumber}`
+        );
+
+        const gradesData = gradesResponse.data;
+        console.log("Grades Data:", gradesData);
+
+        // Group data by course_id, course_year, and course_sem
+        const groupedData = gradesData.reduce((result, item) => {
+          // Find the corresponding curriculum item
+          const curriculumItem = curriculumData.find(
+            (curriculum) => curriculum.course_id === item.course_id
+          );
+
+          if (
+            curriculumItem &&
+            !(
+              programId === 1 &&
+              (strand === "STEM" || strand === "ICT") &&
+              curriculumItem.course_sem === "Bridging"
+            )
+          ) {
+            const key = `${curriculumItem.course_sem}_${
+              curriculumItem.course_year || "undefined"
+            }`;
+
+            if (!result[key]) {
+              result[key] = {
+                course_year: curriculumItem.course_year,
+                course_sem: curriculumItem.course_sem,
+                data: [],
+              };
+            }
+            result[key].data.push(item);
+          }
+
+          return result;
+        }, {});
+
+        console.log("Grouped Data:", groupedData);
+
+        // first year first sem
+        const firstYearFirstSemData =
+          groupedData["FIRST SEMESTER_1"]?.data || [];
+
+        const filteredFirstYearFirstSemData = firstYearFirstSemData.filter(
+          (grade) => grade.grades > 0
+        );
+        setFirstYearFirstSem(filteredFirstYearFirstSemData);
+
+        //compute
+        const sumGrades = filteredFirstYearFirstSemData.reduce(
+          (sum, grade) => sum + grade.grades,
+          0
+        );
+
+        const averageGrade =
+          filteredFirstYearFirstSemData.length > 0
+            ? sumGrades / filteredFirstYearFirstSemData.length
+            : 0;
+
+        // Check if average is NaN (optional)
+        if (!isNaN(averageGrade)) {
+          const roundedAverage = parseFloat(averageGrade.toFixed(2));
+          setFirstYearFirstSemAverage(roundedAverage);
+        }
+        console.log("firstYearFirstSemData", firstYearFirstSemData);
+
+        //First Year Second Sem
+        const firstYearSecondSemData =
+          groupedData["SECOND SEMESTER_1"]?.data || [];
+
+        const filteredFirstYearSecondSemData = firstYearSecondSemData.filter(
+          (grade) => grade.grades > 0
+        );
+
+        setFirstYearSecondSem(filteredFirstYearSecondSemData);
+        //compute
+        const sumGradesSecondSem = filteredFirstYearSecondSemData.reduce(
+          (sum, grade) => sum + grade.grades,
+          0
+        );
+
+        const averageGradeSecondSem =
+          filteredFirstYearSecondSemData.length > 0
+            ? sumGradesSecondSem / filteredFirstYearSecondSemData.length
+            : 0;
+
+        // Check if average is NaN (optional)
+        if (!isNaN(averageGradeSecondSem)) {
+          const roundedAverage = parseFloat(averageGradeSecondSem.toFixed(2));
+          setFirstYearSecondSemAverage(roundedAverage);
+        }
+
+        //Second Year First Sem
+        const secondYearFirstSemData =
+          groupedData["FIRST SEMESTER_2"]?.data || [];
+
+        const filteredSecondYearFirstSemData = secondYearFirstSemData.filter(
+          (grade) => grade.grades > 0
+        );
+        setSecondYearFirstSem(filteredSecondYearFirstSemData);
+
+        //compute
+        const sumGradesSecondFirstSem = filteredSecondYearFirstSemData.reduce(
+          (sum, grade) => sum + grade.grades,
+          0
+        );
+
+        const averageGradeSecondFirstSem =
+          filteredSecondYearFirstSemData.length > 0
+            ? sumGradesSecondFirstSem / filteredSecondYearFirstSemData.length
+            : 0;
+
+        // Check if average is NaN (optional)
+        if (!isNaN(averageGradeSecondFirstSem)) {
+          const roundedAverage = parseFloat(
+            averageGradeSecondFirstSem.toFixed(2)
+          );
+          setSecondYearFirstSemAverage(roundedAverage);
+        }
+
+        //Second Year Second Sem
+        const secondYearSecondSemData =
+          groupedData["SECOND SEMESTER_2"]?.data || [];
+
+        // Filter out grades of -1 and 0
+        const filteredSecondYearSecondSemData = secondYearSecondSemData.filter(
+          (grade) => grade.grades > 0
+        );
+        setSecondYearSecondSem(filteredSecondYearSecondSemData);
+
+        //compute
+        const sumGradesSecondSecondSem = filteredSecondYearSecondSemData.reduce(
+          (sum, grade) => sum + grade.grades,
+          0
+        );
+
+        const averageGradeSecondSecondSem =
+          filteredSecondYearSecondSemData.length > 0
+            ? sumGradesSecondSecondSem / filteredSecondYearSecondSemData.length
+            : 0;
+
+        // Check if average is NaN (optional)
+        if (!isNaN(averageGradeSecondSecondSem)) {
+          const roundedAverage = parseFloat(
+            averageGradeSecondSecondSem.toFixed(2)
+          );
+          setSecondYearSecondSemAverage(roundedAverage);
+        }
+
+        //Second Year Summer Sem
+        const secondYearSummerSemData =
+          groupedData["SUMMER SEMESTER_2"]?.data || [];
+
+        // Filter out grades of -1 and 0
+        const filteredSecondYearSummerSemData = secondYearSummerSemData.filter(
+          (grade) => grade.grades > 0
+        );
+        setSecondYearSummerSem(filteredSecondYearSummerSemData);
+
+        //compute
+        const sumGradesSecondSummerSem = filteredSecondYearSummerSemData.reduce(
+          (sum, grade) => sum + grade.grades,
+          0
+        );
+
+        const averageGradeSecondSummerSem =
+          filteredSecondYearSummerSemData.length > 0
+            ? sumGradesSecondSummerSem / filteredSecondYearSummerSemData.length
+            : 0;
+
+        // Check if average is NaN (optional)
+        if (!isNaN(averageGradeSecondSummerSem)) {
+          const roundedAverage = parseFloat(
+            averageGradeSecondSummerSem.toFixed(2)
+          );
+          setSecondYearSummerSemAverage(roundedAverage);
+        }
+
+        //Third Year First Sem
+        const thirdYearFirstSemData =
+          groupedData["FIRST SEMESTER_3"]?.data || [];
+
+        // Filter out grades of -1 and 0
+        const filteredThirdYearFirstSemData = thirdYearFirstSemData.filter(
+          (grade) => grade.grades > 0
+        );
+        setThirdYearFirstSem(filteredThirdYearFirstSemData);
+
+        //compute
+        const sumGradesThirdFirstSem = filteredThirdYearFirstSemData.reduce(
+          (sum, grade) => sum + grade.grades,
+          0
+        );
+
+        const averageGradeThirdFirstSem =
+          filteredThirdYearFirstSemData.length > 0
+            ? sumGradesThirdFirstSem / filteredThirdYearFirstSemData.length
+            : 0;
+
+        // Check if average is NaN (optional)
+        if (!isNaN(averageGradeThirdFirstSem)) {
+          const roundedAverage = parseFloat(
+            averageGradeThirdFirstSem.toFixed(2)
+          );
+          setThirdYearFirstSemAverage(roundedAverage);
+        }
+
+        //Third Year Second Sem
+        const thirdYearSecondSemData =
+          groupedData["SECOND SEMESTER_3"]?.data || [];
+
+        // Filter out grades of -1 and 0
+        const filteredThirdYearSecondSemData = thirdYearSecondSemData.filter(
+          (grade) => grade.grades > 0
+        );
+
+        setThirdYearSecondSem(filteredThirdYearSecondSemData);
+        //compute
+        const sumGradesThirdSecondSem = filteredThirdYearSecondSemData.reduce(
+          (sum, grade) => sum + grade.grades,
+          0
+        );
+
+        const averageGradeThirdSecondSem =
+          filteredThirdYearSecondSemData.length > 0
+            ? sumGradesThirdSecondSem / filteredThirdYearSecondSemData.length
+            : 0;
+
+        // Check if average is NaN (optional)
+        if (!isNaN(averageGradeThirdSecondSem)) {
+          const roundedAverage = parseFloat(
+            averageGradeThirdSecondSem.toFixed(2)
+          );
+          setThirdYearSecondSemAverage(roundedAverage);
+        }
+
+        //Third Year First Sem
+        const thirdYearSummerSemData =
+          groupedData["SUMMER SEMESTER_3"]?.data || [];
+
+        // Filter out grades of -1 and 0
+        const filteredThirdYearSummerSemData = thirdYearSummerSemData.filter(
+          (grade) => grade.grades > 0
+        );
+        setThirdYearSummerSem(filteredThirdYearSummerSemData);
+
+        //compute
+        const sumGradesThirdSummmerSem = filteredThirdYearSummerSemData.reduce(
+          (sum, grade) => sum + grade.grades,
+          0
+        );
+
+        const averageGradeThirdSummerSem =
+          filteredThirdYearSummerSemData.length > 0
+            ? sumGradesThirdSummmerSem / filteredThirdYearSummerSemData.length
+            : 0;
+
+        // Check if average is NaN (optional)
+        if (!isNaN(averageGradeThirdSummerSem)) {
+          const roundedAverage = parseFloat(
+            averageGradeThirdSummerSem.toFixed(2)
+          );
+          setThirdYearSummerSemAverage(roundedAverage);
+        }
+
+        //Fourth Year First Sem
+        const fourthYearFirstSemData =
+          groupedData["FIRST SEMESTER_4"]?.data || [];
+
+        // Filter out grades of -1 and 0
+        const filteredFourthYearFirstSemData = fourthYearFirstSemData.filter(
+          (grade) => grade.grades > 0
+        );
+        setFourthYearFirstSem(filteredFourthYearFirstSemData);
+
+        //compute
+        const sumGradesFourthFirstSem = fourthYearFirstSemData.reduce(
+          (sum, grade) => sum + grade.grades,
+          0
+        );
+
+        const averageGradeFourthFirstSem =
+          filteredFourthYearFirstSemData.length > 0
+            ? sumGradesFourthFirstSem / filteredFourthYearFirstSemData.length
+            : 0;
+
+        // Check if average is NaN (optional)
+        if (!isNaN(averageGradeFourthFirstSem)) {
+          const roundedAverage = parseFloat(
+            averageGradeFourthFirstSem.toFixed(2)
+          );
+          setFourthYearFirstSemAverage(roundedAverage);
+        }
+
+        // fourthyear second sem
+        const fourthYearSecondSemData =
+          groupedData["SECOND SEMESTER_4"]?.data || [];
+
+        const filteredFourthYearSecondSemData = fourthYearSecondSemData.filter(
+          (grade) => grade.grades > 0
+        );
+        setFourthYearSecondSem(filteredFourthYearSecondSemData);
+
+        //compute
+        const sumGradesFourthSecondSem = filteredFourthYearSecondSemData.reduce(
+          (sum, grade) => sum + grade.grades,
+          0
+        );
+
+        const averageGradeFourthSecondSem =
+          filteredFourthYearSecondSemData.length > 0
+            ? sumGradesFourthSecondSem / filteredFourthYearSecondSemData.length
+            : 0;
+
+        // Check if average is NaN (optional)
+        if (!isNaN(averageGradeFourthSecondSem)) {
+          const roundedAverage = parseFloat(
+            averageGradeFourthSecondSem.toFixed(2)
+          );
+          setFourthYearSecondSemAverage(roundedAverage);
+        }
+
+        if (onGradesDataChange) {
+          onGradesDataChange({
+            firstYearFirstSemAverage,
+            firstYearSecondSemAverage,
+            SecondYearFirstSemAverage,
+            SecondYearSecondSemAverage,
+            SecondYearSummerSemAverage,
+            ThirdYearFirstSemAverage,
+            ThirdYearSecondSemAverage,
+            ThirdYearSummerSemAverage,
+            FourthYearFirstSemAverage,
+            FourthYearSecondSemAverage,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error.message);
+      }
+    };
+
+    fetchData();
+  }, [
+    studentNumber,
+    programId,
+    courseType,
+    strand,
+    firstYearFirstSemAverage,
+    firstYearSecondSemAverage,
+    SecondYearFirstSemAverage,
+    SecondYearSecondSemAverage,
+    SecondYearSummerSemAverage,
+    ThirdYearFirstSemAverage,
+    ThirdYearSecondSemAverage,
+    ThirdYearSummerSemAverage,
+    FourthYearFirstSemAverage,
+    FourthYearSecondSemAverage,
+  ]);
+
+  useEffect(() => {
+    console.log("GradesAverageLine useEffect");
+    console.log(firstYearFirstSem);
+
+    const options = {
+      series: [
+        {
+          data: [
+            firstYearFirstSemAverage,
+            firstYearSecondSemAverage,
+            SecondYearFirstSemAverage,
+            SecondYearSecondSemAverage,
+            SecondYearSummerSemAverage,
+            ThirdYearFirstSemAverage,
+            ThirdYearSecondSemAverage,
+            ThirdYearSummerSemAverage,
+            FourthYearFirstSemAverage,
+            FourthYearSecondSemAverage,
+          ],
+        },
+      ],
+      chart: {
+        //\ height: 400, // Set the desired height
+        //  width: 1000,
+        type: "line",
+        dropShadow: {
+          enabled: true,
+          color: "#000",
+          top: 18,
+          left: 7,
+          blur: 10,
+          opacity: 0.2,
+        },
+        toolbar: {
+          show: false,
+        },
+      },
+      colors: ["#77B6EA"],
+      dataLabels: {
+        enabled: true,
+      },
+      stroke: {
+        curve: "smooth",
+      },
+
+      grid: {
+        borderColor: "#e7e7e7",
+        row: {
+          colors: ["#f3f3f3", "transparent"],
+          opacity: 0.5,
+        },
+      },
+      markers: {
+        size: 1,
+      },
+      xaxis: {
+        categories: [
+          "Year 1 First ",
+          "Year 1 Second ",
+          "Year 2 First ",
+          "Year 2 Second ",
+          "Year 2 Summer ",
+          "Year 3 First ",
+          "Year 3 Second ",
+          "Year 3 Summer ",
+          "Year 4 First ",
+          "Year 4 Second ",
+        ],
+        labels: {
+          style: {
+            fontSize: "12px",
+          },
+        },
+      },
+      yaxis: {
+        min: 1,
+        max: 5,
+        reversed: true,
+        tickAmount: 16,
+        labels: {
+          formatter: function (val) {
+            return val.toFixed(2);
+          },
+        },
+      },
+      legend: {
+        position: "top",
+        horizontalAlign: "right",
+        floating: true,
+        offsetY: -25,
+        offsetX: -5,
+      },
+    };
+
+    const chartElement = document.querySelector("#chart2");
+
+    if (chartElement) {
+      // Check if the chart is already rendered
+      if (!chartElement.classList.contains("apexcharts-canvas")) {
+        const chart = new ApexCharts(chartElement, options);
+        chart.render();
+
+        // Cleanup function to destroy the chart when the component is unmounted
+        return () => {
+          chart.destroy();
+        };
+      }
+    }
+  }, [
+    firstYearFirstSemAverage,
+    firstYearSecondSemAverage,
+    SecondYearFirstSemAverage,
+    SecondYearSecondSemAverage,
+    SecondYearSummerSemAverage,
+    ThirdYearFirstSemAverage,
+    ThirdYearSecondSemAverage,
+    ThirdYearSummerSemAverage,
+    FourthYearFirstSemAverage,
+    FourthYearSecondSemAverage,
+  ]);
+
+  return (
+    <VStack>
+      <Box w={{ base: "300px", md: "400px", lg: "800px" }} id="chart2"></Box>;
+    </VStack>
+  );
+}
+
+BSCEGradesperSemester.propTypes = {
+  studentNumber: PropTypes.string.isRequired,
+  onGradesDataChange: PropTypes.func.isRequired,
+};
